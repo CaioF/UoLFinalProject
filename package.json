@@ -8,14 +8,19 @@
   "author": "Caio Fleury",
   "main": "chatserver.js",
   "repository": {},
-  "scripts": {},
+  "scripts": {
+    "start": "node chatserver.js",
+    "dev": "nodemon chatserver.js"
+  },
   "dependencies": {
     "express": "^4.18.2",
     "nodemon": "^2.0.22",
+    "redis": "^2.8.0",
     "webrtc-adapter": "^1.4.0",
     "websocket": "^1.0.29"
   },
   "devDependencies": {
+    "@types/redis": "^4.0.11",
     "@types/websocket": "^1.0.5"
   }
 }

@@ -1,42 +1,30 @@
 <!doctype html>
 
 <!--
-    WebSocket chat client
+    Stugy Together Web App
 
-    WebSocket and WebRTC based multi-user chat sample with two-way video
-    calling, including use of TURN if applicable or necessary.
-
-    This file provides the structure of the chat client's web page, including
-    logging in, text chatting, and making private video calls to other users.
-
-    To read about how this sample works:  http://bit.ly/webrtc-from-chat
-
-    Any copyright is dedicated to the Public Domain.
-    http:   creativecommons.org/publicdomain/zero/1.0/
+    Study Together is an app that uses WebRTC to stream user data via a peer to peer connection
+    This includes video, audio, text chat, shared work timer, and shared task list.
 -->
+
 
 <html>
 <head>
-  <title>WebSocket Chat Demo with WebRTC Calling</title>
+  <title>Study Together App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="utf-8">
+
+
   <style>
-    /*
-        WebSocket chat client
+    @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300&display=swap');
 
-        WebSocket and WebRTC based multi-user chat sample with two-way video
-        calling, including use of TURN if applicable or necessary.
-
-        This file describes the styling for the contents of the site as
-        presented to users.
-
-        To read about how this sample works:  http://bit.ly/webrtc-from-chat
-
-        Any copyright is dedicated to the Public Domain.
-        http:   creativecommons.org/publicdomain/zero/1.0/
-    */
-
-    /* The grid that contains it all */
-
+  
+    html, body {
+      height: 100%;
+      background-color: #514aac;
+      font-family: 'Lato', sans-serif;
+    }
+  
     .container {
       display: grid;
       min-width: 1250px;
@@ -52,31 +40,41 @@
     .infobox {
       grid-area: infobox;
       overflow: auto;
+      background-color: #fff !important;
     }
 
     .userlistbox {
       grid-area: userlistbox;
-      border: 1px solid black;
-      margin:0;
-      padding:1px;
-      list-style:none;
-      line-height:1.1;
-      overflow-y:auto;
-      overflow-x:hidden;
+      background-color: #fff !important;
+      margin: 0;
+      padding: 1px;
+      list-style: none;
+      line-height: 1.1;
+      overflow-y: auto;
+      border: 0;
+      overflow-x: hidden;
+      border-radius: 4px;   
     }
 
     .userlistbox li {
       cursor: pointer;
-      padding: 1px;
+      padding: 3px 15px;
+      font-weight: 400;
     }
 
     .chatbox {
+      padding: 18px !important;
       grid-area: chatbox;
-      border: 1px solid black;
+      border: 0;
+      letter-spacing: 1px;
       margin: 0;
       overflow-y: scroll;
       padding: 1px;
       padding: 0.1rem 0.5rem;
+      background-color: #fff;
+      border-radius: 4px;
+      color: #18227c;
+      font-weight: 700;
     }
 
     .taskdiv {
@@ -90,18 +88,62 @@
 
     .taskbox {
       margin: 0;
+      text-align: left;
       overflow-y: scroll;
+      letter-spacing: 3px;
+    }
+
+    .task {
+      display: flex;
+      margin: 0;
+      padding: 0;
+      color: orange;
+      font-weight: 800;
+      list-style: none;
+      font-size: 1.2rem;
+      line-height: 1.5;
+      border-bottom: 1px solid #eee;
+      padding: 0.5rem 0;
+      border-radius: 4px;
+      background-color: #18227c;
+      justify-content: space-between;
+      vertical-align: middle;
+    }
+
+    .task :nth-child(1) {
+      margin-left: 1rem;
+      font-size: 0.8rem;
+      vertical-align:middle;
+      padding-top: 0.25rem;
+    }
+
+    .task :nth-child(3) {
+      margin-right: 2rem;
+      vertical-align:middle;
+      background-color: #514aac;
+      width: 31px;
+      cursor: pointer;
+      transition: .2s linear;
+      color: #ff6f00;
+    }
+
+    .task :nth-child(3):hover {
+      background-color: #4aaf5b;
+      color: #fff;
     }
 
     .camerabox {
       grid-area: camerabox;
       width: 500px;
-      height: 375px;
-      border: 1px solid black;
+      height: 400px;
+      border: 0;
+      border-radius: 4px;
       vertical-align: top;
       display: block;
-      position:relative;
-      overflow:auto;
+      position: relative;
+      overflow: auto;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0,0,0,.1);
     }
 
     #received_video {
@@ -124,22 +166,29 @@
     /* The "Hang up" button */
     #hangup-button {
       display:block;
-      width:80px;
-      height:24px;
-      border-radius: 8px;
+      border-radius: 4px;
       position:relative;
       margin:auto;
       top:calc(100% - 40px);
-      background-color: rgba(150, 0, 0, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      box-shadow: 0px 0px 1px 2px rgba(0, 0, 0, 0.4);
       font-size: 14px;
       font-family: "Lucida Grande", "Arial", sans-serif;
       color: rgba(255, 255, 255, 1.0);
       cursor: pointer;
+      background-color: #ff6f00;
+      transition: .2s ease-in;
+      font-size: 16px;
+      height: 33px;
+      width: 20%;
+      border: 0;
+      cursor: pointer !important;
+      box-shadow: 0 0 2px gray;
+    }
+    #hangup-button:hover{
+      background-color: #ffa040;
+      box-shadow: 0 0 1rem #ffa040;
     }
 
-    #hangup-button:hover {
+    /* #hangup-button:hover {
       filter: brightness(150%);
       -webkit-filter: brightness(150%);
     }
@@ -148,39 +197,31 @@
       filter: grayscale(50%);
       -webkit-filter: grayscale(50%);
       cursor: default;
-    }
+    } */
 
     .empty-container {
       grid-area: empty-container;
     }
 
     .chat-controls {
-      grid-area: chat-controls;
-      width: 100%;
-      height: 100%;
-    }
-
-
-    /*
-        Styles to share across samples
-    */
-
-    html, body {
-      height: 100%;
-      font-family:'Open Sans', 'Lucida Grande', Arial, Helvetica, sans-serif;
-    }
+    grid-area: chat-controls;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
     .mdn-disclaimer {
-      font-size:18px;
+      font-size: 18px;
       background-color: #ddd;
       color: black;
-      margin-left: 80px;
+      margin-left: 122px;
       margin-right: 80px;
       max-width: 620px;
       padding: 12px;
       border-radius: 5px;
-      border: 1px solid black;
-      box-shadow: 1px 1px 2px black;
+      box-shadow: 0 0.5rem 1rem gray inset;
     }
 
     .mdn-footer {
@@ -189,19 +230,150 @@
       text-align:right;
       border-top:2px solid #000000;
     }
+
+    .infobox, .taskdiv {
+      background-color: #fff; 
+      box-shadow: 0 2px 5px rgba(0,0,0,.1);
+      border-radius: 4px;
+      padding: 15px;
+      overflow-y: auto;
+      transition: all .2s;
+      text-align: center;
+      border: 0;
+      color: #00004f;
+    }
+    
+    .taskdiv p
+    {
+    font-weight: bold;
+    }
+
+    input#text {
+    height: 38px;
+    background: #fff;
+    cursor: pointer;
+    padding: 1px 8px;
+    }
+
+    .infobox p:nth-child(1) {
+      text-align: center;
+      font-weight: 900;
+      font-size: 25px;
+      color: #00004f;
+    }
+
+    #timers, input[type="submit"] {
+      border-radius: 4px;
+      border: 0;
+      box-shadow: 0 0 2px grey;
+      padding: 6px;
+      background-color: #514aac;
+      color: #fff;
+      outline: 0;
+      cursor: pointer;
+      transition: .2s ease-in;
+      font-size: 15px;
+    }
+
+    #timers:hover{
+      background-color: #4aaf5b;
+    }
+
+    input[type="submit"]:hover{
+      background-color: #4aaf5b;
+    }
+
+    input#name {
+      border: 0;
+      outline: 0;
+      background-color: white !important;
+      height: 42px;
+      width: 180px;
+      padding: 0 14px;
+      box-shadow: 0 0 2px #18227c;
+    }
+
+    input#name:hover{
+      box-shadow: 0 0 2px #ff6f00;
+      transition: .2s;
+    }
+
+    .userlistbox li {
+      text-transform: capitalize;
+      cursor: pointer;
+      padding: 3px 15px;
+      font-weight: 400;
+      color:#000000;
+    }
+
+    .userlistbox li:hover {
+      background-color: #ff6f00;
+      color: #fff;
+      transition: .2s;
+    }
+    
+    input[type="button"] {
+      background-color: #18227c;
+      color: #fff;
+      height: 42px;
+      cursor: pointer;
+      box-shadow: 0 0 2px #ff6f00;
+      width: 56px;
+      cursor: pointer;
+      transition: .2s;
+    }
+
+    input[type="button"]:hover{
+      background-color: #ff6f00;
+    }
+    .infobox p:nth-child(2){
+    font-size: 22px;
+    color: #e68627;
+    font-weight: 900;
+}
+    .infobox p:nth-child(3){
+      text-align: center;
+      margin-right: 40px;
+      font-weight: 700;
+      color: #000;
+      letter-spacing: 2px;
+    }
+
+    .infobox p:nth-child(4) {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+
+    input#taskAdd {
+      height: 41px;
+      border: 0;
+      box-shadow: 0 0 2px #18227c;
+      padding: 0 10px;
+      outline: 0;
+    }
+
+    input#taskAdd:hover{
+      box-shadow: 0 0 2px #ff6f00;
+    }
+    .chatbot b {
+    color: #514aac;
+}
+.chat-controls h2 {
+    color: #ff6f00;
+    letter-spacing: 3px;
+    margin-left: -212px;
+    display: block;
+    font-size: 31px;
+    margin-right: 12px;
+}
+
+
   </style>
   <script type="text/javascript">
-    // WebSocket and WebRTC based multi-user chat sample with two-way video
-    // calling, including use of TURN if applicable or necessary.
-    //
-    // This file contains the JavaScript code that implements the client-side
-    // features for connecting and managing chat and video calls.
-    //
-    // To read about how this sample works:  http://bit.ly/webrtc-from-chat
-    //
-    // Any copyright is dedicated to the Public Domain.
-    // http://creativecommons.org/publicdomain/zero/1.0/
-
+    // Main client side logic
+    // Handles the processing of events
+    // And the sending of messages to the server
     "use strict";
 
     // Get our hostname
@@ -217,24 +389,11 @@
     var connection = null;
     var clientID = 0;
 
-    // The media constraints object describes what sort of stream we want
-    // to request from the local A/V hardware (typically a webcam and
-    // microphone). Here, we specify only that we want both audio and
-    // video; however, you can be more specific. It's possible to state
-    // that you would prefer (or require) specific resolutions of video,
-    // whether to prefer the user-facing or rear-facing camera (if available),
-    // and so on.
-    //
-    // See also:
-    // https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamConstraints
-    // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
-    //
-
     var mediaConstraints = {
-      audio: true,            // We want an audio track
+      audio: true,
       video: {
         aspectRatio: {
-          ideal: 1.333333     // 3:2 aspect is preferred
+          ideal: 1.333333 
         }
       }
     };
@@ -337,8 +496,8 @@
             text = "(" + timeStr + ") <b>" + msg.name + "</b>: " + msg.text + "<br>";
             break;
 
-          case "taskadd":
-            task = "<li id='" + msg.index + "'>(" + msg.name + "): <b>" + msg.text 
+          case "taskadd": // <li> elements of the task list
+            task = "<li class='task' id='" + msg.index + "'><span>[" + msg.name + "]:</span><b>" + msg.text 
               + "</b><button id='" + msg.index + "' onclick='handleTaskDeleteButton(this.id)'>✓</button></li>";
             break;
 
@@ -813,7 +972,7 @@
     // make the offer.
 
     async function invite(evt) {
-      log("Starting to prepare an invitation");
+      log("Starting to prepare an invitation", {data: evt.target});
       if (myPeerConnection) {
         alert("You can't start a call because you already have one open!");
       } else {
@@ -1001,6 +1160,8 @@
 
   </script>
   <script type="text/javascript">
+    // The following code is used to handle the WebRTC signaling process
+    // It was written by the WebRTC team at Mozilla and is used in their samples. 
     (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.adapter = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
     /* eslint-env node */
     'use strict';
@@ -3660,7 +3821,7 @@
   <div class="container">
     <div class="infobox">
       <p>Study Together</p>
-      <p class="mdn-disclaimer"></p>
+      
       <p>Click a username in the user list to ask them to enter a one-on-one video chat with you.</p>
       <p>Enter a username: <input id="name" type="text" maxlength="12" required autocomplete="username" inputmode="verbatim" placeholder="Username">
         <input type="button" name="login" value="Log in" onclick="connect()"></p>
@@ -3693,7 +3854,8 @@
     </div>
     <div class="empty-container"></div>
     <div class="chat-controls">
-      Chat:<br/>
+      <h2>Chat:</h2>
+      <br/>
       <input id="text" type="text" name="text" size="100" maxlength="256" placeholder="Say something meaningful..." autocomplete="off" onkeyup="handleKey(event)" disabled>
       <input type="button" id="send" name="send" value="Send" onclick="handleSendButton()" disabled>
     </div>

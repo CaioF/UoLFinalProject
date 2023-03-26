@@ -1,92 +1,62 @@
 //#!/usr/bin/env node
-//
-// WebSocket chat server
-// Implemented using Node.js
-//
-// Requires the websocket module.
-//
-// WebSocket and WebRTC based multi-user chat sample with two-way video
-// calling, including use of TURN if applicable or necessary.
-//
-// This file contains the JavaScript code that implements the server-side
-// functionality of the chat system, including user ID management, message
-// reflection, and routing of private messages, including support for
-// sending through unknown JSON objects to support custom apps and signaling
-// for WebRTC.
-//
-// Requires Node.js and the websocket module (WebSocket-Node):
-//
-//  - http://nodejs.org/
-//  - https://github.com/theturtle32/WebSocket-Node
-//
-// To read about how this sample works:  http://bit.ly/webrtc-from-chat
-//
-// Any copyright is dedicated to the Public Domain.
-// http://creativecommons.org/publicdomain/zero/1.0/
-
+// Study Together server
 "use strict";
 
-var http = require('http');
-var https = require('https');
-var fs = require('fs');
-var WebSocketServer = require('websocket').server;
-var express = require('express');
-
-// Pathnames of the SSL key and certificate files to use for
-// HTTPS connections.
-
-const keyFilePath = "/etc/pki/tls/private/mdn-samples.mozilla.org.key";
-const certFilePath = "/etc/pki/tls/certs/mdn-samples.mozilla.org.crt";
+const http = require('http');
+const WebSocketServer = require('websocket').server;
+const express = require('express');
+import { get, set } from './redisService';
 
 // Used for managing the text chat user list.
-
 var connectionArray = [];
 var nextID = Date.now();
 var appendToMakeUnique = 1;
 
+// Initialize vars in redis
+async function initRedis() {
+  await set('connectionArray', connectionArray);
+}
+
+// Get connectionsArray from redis
+async function getConnectionArray() {
+  const connectionArray = await get('connectionArray');
+  return connectionArray;
+}
+
+// Set connectionsArray in redis
+async function setConnectionArray(connectionArray) {
+  await set('connectionArray', connectionArray);
+}
+
+initRedis;
+
 // Output logging information to console
-
 function log(text) {
-  var time = new Date();
-
+  const time = new Date();
   console.log("[" + time.toLocaleTimeString() + "] " + text);
 }
 
 // Serve static files for get requests
-var app = express();
+const app = express();
 app.use(express.static('public'));
 app.get('/', function(req, res) {
   res.sendFile(__dirname + '/index.html');
-});
-app.get('/adapter.js', function(req, res) {
-  res.sendFile(__dirname + '/adapter.js');
-});
-app.get('basic.css', function(req, res) {
-  res.sendFile(__dirname + '/basic.css');
-});
-app.get('chat.css', function(req, res) {
-  res.sendFile(__dirname + '/chat.css');
 });
 app.listen(8080, function() {
   log('Client app listening on port 8080!');
 });
 
-// If you want to implement support for blocking specific origins, this is
-// where you do it. Just return false to refuse WebSocket connections given
-// the specified origin.
+// CORS
 function originIsAllowed(origin) {
-  return true;    // We will accept all connections
+  return true;    // Accept all connections for demonstration
 }
 
-// Scans the list of users and see if the specified name is unique. If it is,
-// return true. Otherwise, returns false. We want all users to have unique
-// names.
+// Scans the list of connections and return the one for the specified
 function isUsernameUnique(name) {
   var isUnique = true;
-  var i;
-
-  for (i=0; i<connectionArray.length; i++) {
-    if (connectionArray[i].username === name) {
+  var _connectionArray = getConnectionArray();
+  for (var i=0; i<_connectionArray.length; i++) {
+    if (_connectionArray[i].username === name) {
       isUnique = false;
       break;
     }
@@ -94,136 +64,78 @@ function isUsernameUnique(name) {
   return isUnique;
 }
 
-// Sends a message (which is already stringified JSON) to a single
-// user, given their username. We use this for the WebRTC signaling,
-// and we could use it for private text messaging.
+// Sends a message to one user. The message is a JSON string
 function sendToOneUser(target, msgString) {
-  var isUnique = true;
-  var i;
-
-  for (i=0; i<connectionArray.length; i++) {
-    if (connectionArray[i].username === target) {
-      connectionArray[i].sendUTF(msgString);
+  var _connectionArray = getConnectionArray();
+  for (var i=0; i<_connectionArray.length; i++) {
+    if (_connectionArray[i].username === target) {
+      _connectionArray[i].sendUTF(msgString);
       break;
     }
   }
 }
 
-// Scan the list of connections and return the one for the specified
-// clientID. Each login gets an ID that doesn't change during the session,
-// so it can be tracked across username changes.
+// Scan the list of connections and return the one matching the clientID
 function getConnectionForID(id) {
   var connect = null;
-  var i;
-
-  for (i=0; i<connectionArray.length; i++) {
-    if (connectionArray[i].clientID === id) {
-      connect = connectionArray[i];
+  var _connectionArray = getConnectionArray();
+  for (var i=0; i<_connectionArray.length; i++) {
+    if (_connectionArray[i].clientID === id) {
+      connect = _connectionArray[i];
       break;
     }
   }
-
   return connect;
 }
 
-// Builds a message object of type "userlist" which contains the names of
-// all connected users. Used to ramp up newly logged-in users and,
-// inefficiently, to handle name change notifications.
+// Builds a message object of type "userlist" which contains all connected users
 function makeUserListMessage() {
   var userListMsg = {
     type: "userlist",
     users: []
   };
-  var i;
-
+  var _connectionArray = getConnectionArray();
   // Add the users to the list
-
-  for (i=0; i<connectionArray.length; i++) {
-    userListMsg.users.push(connectionArray[i].username);
+  for (var i=0; i<_connectionArray.length; i++) {
+    userListMsg.users.push(_connectionArray[i].username);
   }
-
   return userListMsg;
 }
 
-// Sends a "userlist" message to all chat members. This is a cheesy way
-// to ensure that every join/drop is reflected everywhere. It would be more
-// efficient to send simple join/drop messages to each user, but this is
-// good enough for this simple example.
+// Sends a "userlist" message to all chat members, for updating the user list
 function sendUserListToAll() {
   var userListMsg = makeUserListMessage();
   var userListMsgStr = JSON.stringify(userListMsg);
-  var i;
-
-  for (i=0; i<connectionArray.length; i++) {
-    connectionArray[i].sendUTF(userListMsgStr);
+  var _connectionArray = getConnectionArray();
+  for (var i=0; i<_connectionArray.length; i++) {
+    _connectionArray[i].sendUTF(userListMsgStr);
   }
 }
 
-
-// Try to load the key and certificate files for SSL so we can
-// do HTTPS (required for non-local WebRTC).
-
-var httpsOptions = {
-  key: null,
-  cert: null
-};
-
-try {
-  httpsOptions.key = fs.readFileSync(keyFilePath);
-  try {
-    httpsOptions.cert = fs.readFileSync(certFilePath);
-  } catch(err) {
-    httpsOptions.key = null;
-    httpsOptions.cert = null;
-  }
-} catch(err) {
-  httpsOptions.key = null;
-  httpsOptions.cert = null;
-}
-
-// If we were able to get the key and certificate files, try to
-// start up an HTTPS server.
-
+// Initiate the http server
 var webServer = null;
-
 try {
-  if (httpsOptions.key && httpsOptions.cert) {
-    webServer = https.createServer(httpsOptions, handleWebRequest);
-  }
+  webServer = http.createServer({}, handleWebRequest);
 } catch(err) {
   webServer = null;
-}
-
-if (!webServer) {
-  try {
-    webServer = http.createServer({}, handleWebRequest);
-  } catch(err) {
-    webServer = null;
-    log(`Error attempting to create HTTP(s) server: ${err.toString()}`);
-  }
+  log(`Error attempting to create HTTP(s) server: ${err.toString()}`);
 }
 
 
-// Our HTTPS server does nothing but service WebSocket
-// connections, so every request just returns 404. Real Web
-// requests are handled by the main server on the box. If you
-// want to, you can return real HTML here and serve Web content.
-
+// WebRTC server is used only for handling events via websockets
+// return 404 for all requests
 function handleWebRequest(request, response) {
   log ("Received request for " + request.url);
   response.writeHead(404);
   response.end();
 }
 
-// Spin up the HTTPS server on the port assigned to this sample.
-// This will be turned into a WebSocket port very shortly.
-
+// Start the server listening on port 6503
 webServer.listen(6503, function() {
   log("WebSocket server is listening on port 6503");
 });
 
-// Create the WebSocket server by converting the HTTPS server into one.
-
+// Create the WebSocket server by converting the HTTP server into one.
 var wsServer = new WebSocketServer({
   httpServer: webServer,
   autoAcceptConnections: false
@@ -236,7 +148,6 @@ if (!wsServer) {
 // Set up a "connect" message handler on our WebSocket server. This is
 // called whenever a user connects to the server's port using the
 // WebSocket protocol.
-
 wsServer.on('request', function(request) {
   if (!originIsAllowed(request.origin)) {
     request.reject();
@@ -251,7 +162,9 @@ wsServer.on('request', function(request) {
   // Add the new connection to our list of connections.
 
   log("Connection accepted from " + connection.remoteAddress + ".");
-  connectionArray.push(connection);
+  let _connectionArray = getConnectionArray()
+  _connectionArray.push(connection);
+  setConnectionArray(_connectionArray);
 
   connection.clientID = nextID;
   nextID++;
@@ -336,15 +249,14 @@ wsServer.on('request', function(request) {
 
       if (sendToClients) {
         var msgString = JSON.stringify(msg);
-        var i;
-
+        var _connectionArray = getConnectionArray();
         // If the message specifies a target username, only send the
         // message to them. Otherwise, send it to every user.
         if (msg.target && msg.target !== undefined && msg.target.length !== 0) {
           sendToOneUser(msg.target, msgString);
         } else {
-          for (i=0; i<connectionArray.length; i++) {
-            connectionArray[i].sendUTF(msgString);
+          for (var i=0; i<_connectionArray.length; i++) {
+            _connectionArray[i].sendUTF(msgString);
           }
         }
       }
@@ -355,16 +267,17 @@ wsServer.on('request', function(request) {
   // or has been disconnected.
   connection.on('close', function(reason, description) {
     // First, remove the connection from the list of connections.
-    connectionArray = connectionArray.filter(function(el, idx, ar) {
+    var _connectionArray = getConnectionArray();
+    _connectionArray = _connectionArray.filter(function(el, idx, ar) {
       return el.connected;
     });
+    setConnectionArray(_connectionArray);
 
     // Now send the updated user list. Again, please don't do this in a
     // real application. Your users won't like you very much.
     sendUserListToAll();
 
     // Build and output log output for close information.
-
     var logMessage = "Connection closed: " + connection.remoteAddress + " (" +
                      reason;
     if (description !== null && description.length !== 0) {
